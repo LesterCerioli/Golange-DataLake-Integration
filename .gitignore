@@ -1,0 +1,47 @@
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Output of the go coverage tool
+coverage.out
+
+# IDE/editor specific files
+.idea/
+*.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Go workspace files
+*.mod
+*.sum
+
+# Vendor directory (if you are not using Go modules, uncomment this line)
+# /vendor/
+
+# Dependencies
+/go/pkg/
+go.sum
+
+# Logs
+*.log
+
+# Docker related files
+Dockerfile
+docker-compose.yml
+
+# Environment variable files
+.env
+
+# Generated folders and files
+bin/
+tmp/
+
+# Test output
+testdata/
