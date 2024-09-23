@@ -13,17 +13,6 @@ import (
 	_ "github.com/jackc/pgx/v4/stdlib" // PostgreSQL driver
 )
 
-const (
-	accountName   = "your-account-name"
-	accountKey    = "your-account-key"
-	containerName = "your-container-name"  // Equivalent to filesystem in Data Lake
-	blobName      = "exports/data.csv"     // Path in Azure Data Lake where the file will be uploaded
-)
-
-const (
-	postgresDSN = "postgres://user:password@localhost:5432/payments_db"
-)
-
 func exportDataToCSV(db *sql.DB, filePath string) error {
 	query := `
 		SELECT c.full_name, c.email, p.amount, pm.method_name, p.status, p.payment_date
@@ -46,10 +35,10 @@ func exportDataToCSV(db *sql.DB, filePath string) error {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	// Write CSV header
+	// Write header
 	writer.Write([]string{"Customer Name", "Email", "Amount", "Payment Method", "Status", "Payment Date"})
 
-	// Write each row from the database
+	// Write rows
 	for rows.Next() {
 		var fullName, email, methodName, status string
 		var amount float64
@@ -60,26 +49,40 @@ func exportDataToCSV(db *sql.DB, filePath string) error {
 		}
 
 		record := []string{fullName, email, fmt.Sprintf("%.2f", amount), methodName, status, paymentDate.Format(time.RFC3339)}
-		writer.Write(record)
+		err := writer.Write(record)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
 func uploadFileToAzure(filePath string) error {
-	// Create a service client using Azure Storage account details
+	// Get Azure Storage account details from environment variables
+	accountName := os.Getenv("AZURE_ACCOUNT_NAME")
+	accountKey := os.Getenv("AZURE_ACCOUNT_KEY")
+	containerName := os.Getenv("AZURE_CONTAINER_NAME")
+	blobName := os.Getenv("AZURE_BLOB_NAME")
+
+	if accountName == "" || accountKey == "" || containerName == "" || blobName == "" {
+		return fmt.Errorf("missing Azure environment variables")
+	}
+
+	// Service client using Azure Storage account details
 	cred, err := azblob.NewSharedKeyCredential(accountName, accountKey)
 	if err != nil {
 		return fmt.Errorf("error creating Azure credentials: %v", err)
 	}
 
-	// Create the pipeline
-	serviceClient, err := azblob.NewServiceClientWithSharedKey(fmt.Sprintf("https://%s.blob.core.windows.net/", accountName), cred, nil)
+	// Create the service client (for the storage account)
+	serviceURL := fmt.Sprintf("https://%s.blob.core.windows.net/", accountName)
+	serviceClient, err := azblob.NewServiceClientWithSharedKey(serviceURL, cred, nil)
 	if err != nil {
 		return fmt.Errorf("error creating Azure service client: %v", err)
 	}
 
-	// Get a reference to the container
+	// Get a reference to the container using the service client
 	containerClient := serviceClient.NewContainerClient(containerName)
 
 	// Open the file for upload
@@ -90,7 +93,7 @@ func uploadFileToAzure(filePath string) error {
 	defer file.Close()
 
 	// Upload the file
-	blobClient := containerClient.NewBlobClient(blobName)
+	blobClient := containerClient.NewBlockBlobClient(blobName)
 	_, err = blobClient.UploadFile(context.Background(), file, nil)
 	if err != nil {
 		return fmt.Errorf("error uploading file to Azure Data Lake: %v", err)
@@ -100,6 +103,12 @@ func uploadFileToAzure(filePath string) error {
 }
 
 func ExportAndUpload() error {
+	// Get PostgreSQL connection string from environment variables
+	postgresDSN := os.Getenv("POSTGRES_DSN")
+	if postgresDSN == "" {
+		return fmt.Errorf("missing PostgreSQL DSN environment variable")
+	}
+
 	// Connect to PostgreSQL
 	db, err := sql.Open("pgx", postgresDSN)
 	if err != nil {
