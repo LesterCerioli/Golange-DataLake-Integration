@@ -1,3 +1,6 @@
+CREATE DATABASE payments_db;
+
+
 CREATE TABLE IF NOT EXISTS customers {
     id SERIAL PRIMARY KEY,
     full_name VARCHAR(250) NOT NULL,
