@@ -1,37 +1,24 @@
 package main
 
 import (
-	"data-lake/services"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
-	"context"
-	"encoding/csv"
-	"fmt"
-	"os"
-	"time"
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azdatalake"
-	_ "github.com/jackc/pgx/v4/stdlib" 
-
-	
-)
-
-const (
-	accountName = "your-account-name"
-	accountKey = "your-account-key"
-	fileSystem    = "your-file-system-name" 
-	azureFilePath = "exports/data.csv" 
-)
-
-const (
-	postgresDSN = "postgres://user:password@localhost:5432/payments_db"
+	"data-lake/services"
 )
 
 func main() {
 	app := fiber.New()
 
-	app.Post("/loign", services.Login)
-	app.Get("/secure-data", services.SecureData)
+	// Endpoint to export data from PostgreSQL and upload it to Azure Data Lake
+	app.Get("/export", func(c *fiber.Ctx) error {
+		err := services.ExportAndUpload()
+		if err != nil {
+			log.Printf("Failed to export and upload data: %v", err)
+			return c.Status(fiber.StatusInternalServerError).SendString("Data export failed")
+		}
+		return c.SendString("Data exported and uploaded successfully")
+	})
 
 	log.Fatal(app.Listen(":3000"))
 }
